@@ -1,2 +1,2 @@
 # npm.vim
-Work with NPM easier in VIM
+> Work with NPM more easier in VIM
