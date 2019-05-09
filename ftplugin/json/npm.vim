@@ -1,4 +1,4 @@
-if bufname('%') !=# 'package.json' || v:version < 600
+if bufname('%') !=# 'package.json' || v:version < 800
     finish
 endif
 
