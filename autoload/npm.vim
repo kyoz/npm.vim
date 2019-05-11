@@ -22,16 +22,24 @@ endif
 function! npm#get_latest_version(package_name) abort
     let l:result = s:get_version(a:package_name, 'latest')
 
+    if len(l:result) == 0
+        return
+    endif
+
     " TODO: try to show float-preview if using nvim
-    
+
     redraw | echo l:result
 endfunction
 
 function! npm#get_all_versions(package_name) abort
     let l:result = s:get_version(a:package_name, 'all')
 
+    if len(l:result) == 0
+        return
+    endif
+
     let l:buffer_index = bufwinnr('__packages_versions__')
-    
+
     if l:buffer_index > 0
         execute l:buffer_index . 'wincmd w'
         setlocal modifiable
@@ -92,6 +100,7 @@ function! s:get_version(package_name, option) abort
             echohl ErrorMsg
             redraw | echo "Can't get infomation of '" . a:package_name . "'"
             echohl None
+            return []
         else
             if a:option ==# 'latest'
                 if g:npm_cli ==# 'npm'
