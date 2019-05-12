@@ -1,4 +1,4 @@
-if expand('%:t') !=# 'package.json' || v:version < 800
+if v:version < 800
     finish
 endif
 

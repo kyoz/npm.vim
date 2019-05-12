@@ -1,7 +1,7 @@
 " npm#get_cli() {{{
 function! npm#get_cli() abort
     let l:cli_version_regex = '\v[0-9]+\.[0-9]+\.?([0-9]+)?-?(.+)?'
-    let l:npm_version       = split(system('nsspm -v'), '\n')[0]
+    let l:npm_version       = split(system('npm -v'), '\n')[0]
     let l:yarn_version      = split(system('yarn -v'), '\n')[0]
 
     if l:npm_version =~# l:cli_version_regex
@@ -14,7 +14,9 @@ function! npm#get_cli() abort
 
 	let s:loaded = 1
 
-    call npm#init_mappings()
+    if g:npm_cli ==# 'npm' || g:npm_cli ==# 'yarn'
+        call npm#init_mappings()
+    endif
 endfunction
 " }}}
 
