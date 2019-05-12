@@ -5,4 +5,3 @@ endif
 if !exists('g:npm_cli')
     call npm#get_cli()
 endif
-

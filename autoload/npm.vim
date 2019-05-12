@@ -1,4 +1,4 @@
-" Autoload Functions {{{
+" npm#get_cli() {{{
 function! npm#get_cli() abort
     let l:cli_version_regex = '\v[0-9]+\.[0-9]+\.?([0-9]+)?-?(.+)?'
     let l:npm_version       = split(system('nsspm -v'), '\n')[0]
@@ -13,72 +13,66 @@ function! npm#get_cli() abort
     endif
 
 	let s:loaded = 1
+
+    call npm#init_mappings()
 endfunction
+" }}}
+
+" npm#init_mappings() {{{
+function! npm#init_mappings() abort
+    nnoremap <Plug>Npm_GetLatestVersion :call npm#get_latest_version()<CR>
+    nnoremap <Plug>Npm_GetAllVersions :call npm#get_all_versions()<CR>
+
+    nmap <leader>n <Plug>Npm_GetLatestVersion
+    vmap <leader>n <Plug>Npm_GetLatestVersion
+    nmap <leader>N <Plug>Npm_GetAllVersions
+    vmap <leader>N <Plug>Npm_GetAllVersions
+endfunction
+" }}}
 
 if !exists('s:loaded')
     finish
 endif
 
-function! npm#get_latest_version(package_name) abort
-    let l:result = s:get_version(a:package_name, 'latest')
+" npm#get_package_name_at_cursor() {{{
+function! npm#get_package_name_at_cursor() abort
+    " set iskeyword to match @,-,/,A-Z, a-z, 0-9
+    let l:current_iskeyword = substitute(execute('echo &iskeyword'), '[[:cntrl:]]', '', 'g')
+    set iskeyword=@-@,-,/,47,65-90,97-122,48-57
 
-    if len(l:result) == 0
-        return
+    let l:package_name = substitute(expand('<cword>'), '[ \t]+', '', 'g')
+
+    " Reset user iskeyword setting
+    silent execute "normal! :set iskeyword=" . l:current_iskeyword . "\<cr>"
+
+    " Regex for valid npm name:
+    " ^@?([[:<:]](?!-)[0-9a-zA-Z-]+[[:>:]](?!-))\/?([[:<:]](?!-)[0-9a-zA-Z-]+[[:>:]](?!-))?
+    " But it not work with vim regex so i have to validate my self
+    let l:is_valid_package = 1
+
+    if len(l:package_name) > 214 || !(l:package_name =~# '\v^[@0-9A-Za-z/-]+$')
+        let l:is_valid_package = 0
     endif
 
-    " TODO: try to show float-preview if using nvim
-
-    redraw | echo l:result
-endfunction
-
-function! npm#get_all_versions(package_name) abort
-    let l:result = s:get_version(a:package_name, 'all')
-
-    if len(l:result) == 0
-        return
-    endif
-
-    let l:buffer_index = bufwinnr('__packages_versions__')
-
-    if l:buffer_index > 0
-        execute l:buffer_index . 'wincmd w'
-        setlocal modifiable
-    else
-        rightbelow 50vsplit __packages_versions__
-    endif
-
-    normal! ggdG
-    setlocal filetype=package-versions
-    setlocal buftype=nofile
-
-    call append(0, 'Package: ' . a:package_name)
-    call append(2, '[')
-    call append(3, map(l:result, '"    " . v:val . ""'))
-    call append(len(l:result) + 3, ']')
-
-    setlocal nomodifiable
-    normal! gg
-endfunction
-
-function! npm#info() abort
-    if exists('g:npm_cli') && exists('g:npm_cli_version')
-        echo 'Package Manager: ' . g:npm_cli . ' (' . g:npm_cli_version . ')'
-    else
+    if l:is_valid_package ==# 0
         echohl ErrorMsg
-        echo 'You must install Npm or Yarn to use this plugin !'
+        redraw | echomsg l:package_name . " isn't a valid package name !"
         echohl None
+        return ''
     endif
+
+    return l:package_name
 endfunction
 " }}}
 
-" Local Functions {{{
+" npm#get_version() {{{
 " option: 'latest' | 'all'
 "   - 'latest': Return only the latest version of package
 "   - 'all': Return all versions of package
-function! s:get_version(package_name, option) abort
+function! npm#get_version(package_name, option) abort
     if len(a:package_name) > 0
 
-        echo 'Getting ' . a:package_name . ' infomation... (with ' . g:npm_cli . ')'
+        redraw! | echo 'Getting ' . a:package_name . ' infomation... (with ' . g:npm_cli . ')'
 
         if a:option ==# 'latest'
             let l:param = 'version'
@@ -128,5 +122,70 @@ function! s:get_version(package_name, option) abort
     endif
 
     return 0
+endfunction
+" }}}
+
+" npm#get_latest_version() {{{
+function! npm#get_latest_version() abort
+    let l:package_name = npm#get_package_name_at_cursor()
+
+    if len(l:package_name) ==# 0 | return | endif
+
+    let l:result = npm#get_version(l:package_name, 'latest')
+
+    if len(l:result) == 0
+        return
+    endif
+
+    " TODO: try to show float-preview if using nvim
+
+    redraw | echo l:result
+endfunction
+" }}}
+
+" npm#get_all_versions() {{{
+function! npm#get_all_versions() abort
+    let l:package_name = npm#get_package_name_at_cursor()
+
+    if len(l:package_name) ==# 0 | return | endif
+
+    let l:result = npm#get_version(l:package_name, 'all')
+
+    if len(l:result) == 0
+        return
+    endif
+
+    let l:buffer_index = bufwinnr('__packages_versions__')
+
+    if l:buffer_index > 0
+        execute l:buffer_index . 'wincmd w'
+        setlocal modifiable
+    else
+        rightbelow 50vsplit __packages_versions__
+    endif
+
+    normal! ggdG
+    setlocal filetype=package-versions
+    setlocal buftype=nofile
+
+    call append(0, 'Package: ' . l:package_name)
+    call append(2, '[')
+    call append(3, map(l:result, '"    " . v:val . ""'))
+    call append(len(l:result) + 3, ']')
+
+    setlocal nomodifiable
+    normal! gg
+endfunction
+" }}}
+
+" npm#info() {{{
+function! npm#info() abort
+    if exists('g:npm_cli') && exists('g:npm_cli_version')
+        echo 'Package Manager: ' . g:npm_cli . ' (' . g:npm_cli_version . ')'
+    else
+        echohl ErrorMsg
+        echo 'You must install Npm or Yarn to use this plugin !'
+        echohl None
+    endif
 endfunction
 " }}}
