@@ -1,25 +1,3 @@
-" npm#get_cli() {{{
-function! npm#get_cli() abort
-    let l:cli_version_regex = '\v[0-9]+\.[0-9]+\.?([0-9]+)?-?(.+)?'
-    let l:npm_version       = split(system('npm -v'), '\n')[0]
-    let l:yarn_version      = split(system('yarn -v'), '\n')[0]
-
-    if l:npm_version =~# l:cli_version_regex
-        let g:npm_cli = 'npm'
-        let g:npm_cli_version = l:npm_version
-    elseif l:yarn_version =~# l:cli_version_regex
-        let g:npm_cli = 'yarn'
-        let g:npm_cli_version = l:yarn_version
-    endif
-
-	let s:loaded = 1
-
-    if g:npm_cli ==# 'npm' || g:npm_cli ==# 'yarn'
-        call npm#init_mappings()
-    endif
-endfunction
-" }}}
-
 " npm#init_mappings() {{{
 function! npm#init_mappings() abort
     nnoremap <Plug>(npm-get-latest-version) :call npm#get_latest_version('')<CR>
@@ -33,15 +11,38 @@ function! npm#init_mappings() abort
     command! -nargs=1 NpmL      call npm#get_latest_version(<f-args>)
     command! -nargs=1 NpmAll    call npm#get_all_versions(<f-args>)
     command! -nargs=1 NpmA      call npm#get_all_versions(<f-args>)
+
+	let g:npm_inited = 1
 endfunction
 " }}}
 
-if !exists('s:loaded')
+if !exists('g:npm_inited')
     finish
 endif
 
+" npm#get_cli() {{{
+function! npm#get_cli() abort
+    redraw | echo 'Getting CLI...'
+    let l:cli_version_regex = '\v[0-9]+\.[0-9]+\.?([0-9]+)?-?(.+)?'
+    let l:npm_version       = split(system('npm -v'), '\n')[0]
+    let l:yarn_version      = split(system('yarn -v'), '\n')[0]
+
+    if l:npm_version =~# l:cli_version_regex
+        let g:npm_cli = 'npm'
+        let g:npm_cli_version = l:npm_version
+    elseif l:yarn_version =~# l:cli_version_regex
+        let g:npm_cli = 'yarn'
+        let g:npm_cli_version = l:yarn_version
+    endif
+endfunction
+" }}}
+
 " npm#get_package_name() {{{
 function! npm#get_package_name(package_name) abort
+    if !exists('g:npm_cli')
+        execute "normal! :call npm#get_cli()\<cr>"
+    endif
+
     " set iskeyword to match @,-,/,A-Z, a-z, 0-9
     let l:current_iskeyword = substitute(execute('echo &iskeyword'), '[[:cntrl:]]', '', 'g')
     set iskeyword=@-@,-,/,47,65-90,97-122,48-57
@@ -80,6 +81,13 @@ endfunction
 "   - 'latest': Return only the latest version of package
 "   - 'all': Return all versions of package
 function! npm#get_version(package_name, option) abort
+    if !exists('g:npm_cli')
+        echohl ErrorMsg
+        redraw | echomsg "You must install npm or yarn for this plugin to work"
+        echohl None
+        return ''
+    endif
+
     if len(a:package_name) > 0
 
         redraw! | echo 'Getting ' . a:package_name . ' infomation... (with ' . g:npm_cli . ')'
@@ -143,7 +151,7 @@ function! npm#get_latest_version(package_name) abort
 
     let l:result = npm#get_version(l:package_name, 'latest')
 
-    if len(l:result) == 0
+    if len(l:result) ==# 0
         return
     endif
 
@@ -161,7 +169,7 @@ function! npm#get_all_versions(package_name) abort
 
     let l:result = npm#get_version(l:package_name, 'all')
 
-    if len(l:result) == 0
+    if len(l:result) ==# 0
         return
     endif
 
