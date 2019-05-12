@@ -20,13 +20,11 @@ endfunction
 
 " npm#init_mappings() {{{
 function! npm#init_mappings() abort
-    nnoremap <Plug>Npm_GetLatestVersion :call npm#get_latest_version()<CR>
-    nnoremap <Plug>Npm_GetAllVersions :call npm#get_all_versions()<CR>
+    nnoremap <Plug>(npm-get-latest-version) :call npm#get_latest_version()<CR>
+    nnoremap <Plug>(npm-get-all-versions)   :call npm#get_all_versions()<CR>
 
-    nmap <leader>n <Plug>Npm_GetLatestVersion
-    vmap <leader>n <Plug>Npm_GetLatestVersion
-    nmap <leader>N <Plug>Npm_GetAllVersions
-    vmap <leader>N <Plug>Npm_GetAllVersions
+    nmap <leader>n <Plug>(npm-get-latest-version)
+    nmap <leader>N <Plug>(npm-get-all-versions)
 endfunction
 " }}}
 
@@ -139,7 +137,7 @@ function! npm#get_latest_version() abort
 
     " TODO: try to show float-preview if using nvim
 
-    redraw | echo l:result
+    redraw | echom l:result
 endfunction
 " }}}
 
