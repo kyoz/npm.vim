@@ -6,8 +6,7 @@
                            | |\  | |_) | | | | | | ~
                            |_| \_| .__/|_| |_| |_| ~
                                  |_|               ~
-
-       Simple Plugin to help you work more faster, easier with Npm in Vim
+                                      ~ Npm in Vim !
 
 ==============================================================================
 CONTENTS                                                           *NpmContents*

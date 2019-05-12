@@ -25,6 +25,12 @@ function! npm#init_mappings() abort
 
     nmap <leader>n <Plug>(npm-get-latest-version)
     nmap <leader>N <Plug>(npm-get-all-versions)
+
+    command! -nargs=1 Npm       call npm#get_latest_version(<f-args>)
+    command! -nargs=1 NpmLatest call npm#get_latest_version(<f-args>)
+    command! -nargs=1 NpmL      call npm#get_latest_version(<f-args>)
+    command! -nargs=1 NpmAll    call npm#get_all_versions(<f-args>)
+    command! -nargs=1 NpmA      call npm#get_all_versions(<f-args>)
 endfunction
 " }}}
 
@@ -32,13 +38,17 @@ if !exists('s:loaded')
     finish
 endif
 
-" npm#get_package_name_at_cursor() {{{
-function! npm#get_package_name_at_cursor() abort
+" npm#get_package_name() {{{
+function! npm#get_package_name(package_name) abort
     " set iskeyword to match @,-,/,A-Z, a-z, 0-9
     let l:current_iskeyword = substitute(execute('echo &iskeyword'), '[[:cntrl:]]', '', 'g')
     set iskeyword=@-@,-,/,47,65-90,97-122,48-57
 
-    let l:package_name = substitute(expand('<cword>'), '[ \t]+', '', 'g')
+    if len(a:package_name) > 0
+        let l:package_name = a:package_name
+    else
+        let l:package_name = substitute(expand('<cword>'), '[ \t]+', '', 'g')
+    endif
 
     " Reset user iskeyword setting
     silent execute "normal! :set iskeyword=" . l:current_iskeyword . "\<cr>"
@@ -124,8 +134,8 @@ endfunction
 " }}}
 
 " npm#get_latest_version() {{{
-function! npm#get_latest_version() abort
-    let l:package_name = npm#get_package_name_at_cursor()
+function! npm#get_latest_version(package_name) abort
+    let l:package_name = npm#get_package_name(a:package_name)
 
     if len(l:package_name) ==# 0 | return | endif
 
@@ -142,8 +152,8 @@ endfunction
 " }}}
 
 " npm#get_all_versions() {{{
-function! npm#get_all_versions() abort
-    let l:package_name = npm#get_package_name_at_cursor()
+function! npm#get_all_versions(package_name) abort
+    let l:package_name = npm#get_package_name(a:package_name)
 
     if len(l:package_name) ==# 0 | return | endif
 
