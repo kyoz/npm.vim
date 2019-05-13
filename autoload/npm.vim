@@ -97,14 +97,10 @@ function! npm#get_version(package_name, option) abort
 
         redraw! | echo 'Getting ' . a:package_name . ' infomation... (with ' . g:npm_cli . ')'
 
-        if a:option ==# 'latest'
-            let l:param = 'version'
+        if g:npm_cli ==# 'npm'
+            let l:param = 'versions --json'
         else
-            if g:npm_cli ==# 'npm'
-                let l:param = 'versions --json'
-            else
-                let l:param = 'versions'
-            endif
+            let l:param = 'versions'
         endif
 
         if g:npm_cli ==# 'npm'
@@ -113,29 +109,28 @@ function! npm#get_version(package_name, option) abort
             let l:result = system('yarn info ' . a:package_name . ' ' . l:param)
         endif
 
-        if l:result =~? '\verr|error|invalid'
-            echohl ErrorMsg
+        if l:result =~? 'error \|npm ERR! ' || type(l:result) !=# 1
+            echohl ErrorMsg 
             redraw | echo "Can't get infomation of '" . a:package_name . "'"
             echohl None
             return []
         else
-            if a:option ==# 'latest'
-                if g:npm_cli ==# 'npm'
-                    return split(l:result, '\n')[0]
-                else
-                    return split(l:result, '\n')[1]
-                endif
+            if g:npm_cli ==# 'npm'
+                " Remove all null character ^@
+                let l:result = substitute(l:result, '[[:cntrl:]]', '', 'g')
+                " Remove all trailing white space
+                let l:result = substitute(l:result, '[ \t]+', '', 'g')
+                " Parse result as list and reverse it
+                let l:result = reverse(eval(l:result))
+
             else
-                if g:npm_cli ==# 'npm'
-                    " Remove all null character ^@
-                    let l:result = substitute(l:result, '[[:cntrl:]]', '', 'g')
-                    " Remove all trailing white space
-                    let l:result = substitute(l:result, '[ \t]+', '', 'g')
-                    " Parse result as list and reverse it
-                    return reverse(eval(l:result))
-                else
-                    return reverse(eval(join(split(l:result, '\n')[1:-2], '')))
-                endif
+                let l:result = reverse(eval(join(split(l:result, '\n')[1:-2], '')))
+            endif
+
+            if a:option ==# 'latest'
+                return l:result[0]
+            else
+                return l:result
             endif
         endif
     else
@@ -185,10 +180,11 @@ function! npm#get_all_versions(package_name) abort
 
     if l:buffer_index > 0
         execute l:buffer_index . 'wincmd w'
-        setlocal modifiable
     else
         rightbelow 50vsplit __packages_versions__
     endif
+
+    setlocal modifiable
 
     normal! ggdG
     setlocal filetype=package-versions
@@ -242,3 +238,8 @@ function! s:ClosePopup() abort
 endfunction
 " }}}
 
+" TODO:
+" - Update package and all packages feature
+" NOTES:
+" - npm install --save --save-exact package@version
+" - yarn add package@version
