@@ -36,12 +36,13 @@ function! npm#get_cli() abort
     let l:npm_version       = split(system('npm -v'), '\n')[0]
     let l:yarn_version      = split(system('yarn -v'), '\n')[0]
 
-    if l:npm_version =~# l:cli_version_regex
-        let g:npm_cli = 'npm'
-        let g:npm_cli_version = l:npm_version
-    elseif l:yarn_version =~# l:cli_version_regex
+    " Preper yarn cause it's seem faster
+    if l:yarn_version =~# l:cli_version_regex
         let g:npm_cli = 'yarn'
         let g:npm_cli_version = l:yarn_version
+    elseif l:npm_version =~# l:cli_version_regex
+        let g:npm_cli = 'npm'
+        let g:npm_cli_version = l:npm_version
     endif
 endfunction
 " }}}
@@ -164,9 +165,12 @@ function! npm#get_latest_version(package_name) abort
         return
     endif
 
-    " TODO: try to show float-preview if using nvim
-
-    redraw | echom "Latest version of '" . l:package_name . "': " . l:result
+    " Try to show float-preview if using nvim
+    if has('nvim-0.4.0') && get(g:, 'npm_allow_floating_window', 1)
+        call npm#open_floating_window(' Latest: ' . l:result . ' ')
+    else
+        redraw | echom "Latest version of '" . l:package_name . "': " . l:result
+    endif
 endfunction
 " }}}
 
@@ -202,6 +206,44 @@ function! npm#get_all_versions(package_name) abort
 
     setlocal nomodifiable
     normal! gg
+endfunction
+" }}}
+
+" npm#open_floating_window() {{{
+function! npm#open_floating_window(content) abort
+    redraw | echo ''
+    let buf = nvim_create_buf(v:false, v:true)
+    call nvim_buf_set_lines(buf, 0, -1, v:true, [a:content])
+    let opts = {
+        \ 'relative': 'cursor',
+        \ 'width': len(a:content) + 2,
+        \ 'height': 1,
+        \ 'col': 0,
+        \ 'row': 1,
+        \ 'anchor': 'NW'}
+
+    let g:npm_disable_autocmd = 1
+    let s:popup_win_id = nvim_open_win(buf, v:true, opts)
+
+    " New buffer settings
+    setlocal buftype=nofile | setlocal bufhidden=wipe | setlocal signcolumn=no
+    setlocal filetype=package-latest-version | setlocal nowrap
+    setlocal nomodifiable | setlocal nobuflisted | setlocal noswapfile
+    setlocal nonumber | setlocal norelativenumber | setlocal nocursorline
+
+    wincmd p | unlet g:npm_disable_autocmd
+
+    augroup NpmClosePopup
+        autocmd!
+        autocmd CursorMoved,CursorMovedI,InsertEnter,BufLeave <buffer> call <SID>ClosePopup()
+    augroup END
+endfunction
+
+function! s:ClosePopup() abort
+    if exists('s:popup_win_id') && !exists('g:npm_disable_autocmd')
+        call nvim_win_close(s:popup_win_id, 1)
+        unlet s:popup_win_id
+    endif
 endfunction
 " }}}
 
