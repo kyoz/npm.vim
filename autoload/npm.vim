@@ -230,7 +230,7 @@ function! npm#open_floating_window(content) abort
 
     augroup NpmClosePopup
         autocmd!
-        autocmd CursorMoved,CursorMovedI,InsertEnter,BufLeave <buffer> call <SID>ClosePopup()
+        autocmd CursorMoved,CursorMovedI,InsertEnter,BufEnter,BufLeave <buffer> call <SID>ClosePopup()
     augroup END
 endfunction
 
