@@ -32,17 +32,12 @@ endif
 " npm#get_cli() {{{
 function! npm#get_cli() abort
     redraw | echo 'Getting CLI...'
-    let l:cli_version_regex = '\v[0-9]+\.[0-9]+\.?([0-9]+)?-?(.+)?'
-    let l:npm_version       = split(system('npm -v'), '\n')[0]
-    let l:yarn_version      = split(system('yarn -v'), '\n')[0]
 
     " Preper yarn cause it's seem faster
-    if l:yarn_version =~# l:cli_version_regex
+    if executable('yarn')
         let g:npm_cli = 'yarn'
-        let g:npm_cli_version = l:yarn_version
-    elseif l:npm_version =~# l:cli_version_regex
+    elseif executable('npm')
         let g:npm_cli = 'npm'
-        let g:npm_cli_version = l:npm_version
     endif
 endfunction
 " }}}
@@ -247,14 +242,3 @@ function! s:ClosePopup() abort
 endfunction
 " }}}
 
-" npm#info() {{{
-function! npm#info() abort
-    if exists('g:npm_cli') && exists('g:npm_cli_version')
-        echo 'Package Manager: ' . g:npm_cli . ' (' . g:npm_cli_version . ')'
-    else
-        echohl ErrorMsg
-        echo 'You must install Npm or Yarn to use this plugin !'
-        echohl None
-    endif
-endfunction
-" }}}
