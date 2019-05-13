@@ -1,10 +1,19 @@
 " npm#init_mappings() {{{
 function! npm#init_mappings() abort
+    if !get(g:, 'npm_default_mappings', 1)
+        return
+    endif
+
     nnoremap <Plug>(npm-get-latest-version) :call npm#get_latest_version('')<CR>
     nnoremap <Plug>(npm-get-all-versions)   :call npm#get_all_versions('')<CR>
 
-    nmap <leader>n <Plug>(npm-get-latest-version)
-    nmap <leader>N <Plug>(npm-get-all-versions)
+    if !hasmapto('<Plug>(npm-get-latest-version)')
+        nmap <leader>n <Plug>(npm-get-latest-version)
+    endif
+
+    if !hasmapto('<Plug>(npm-get-all-versions)')
+        nmap <leader>N <Plug>(npm-get-all-versions)
+    endif
 
     command! -nargs=1 Npm       call npm#get_latest_version(<f-args>)
     command! -nargs=1 NpmLatest call npm#get_latest_version(<f-args>)
