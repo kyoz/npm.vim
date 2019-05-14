@@ -6,6 +6,7 @@ function! npm#init_mappings() abort
 
     nnoremap <Plug>(npm-get-latest-version) :call npm#get_latest_version('')<CR>
     nnoremap <Plug>(npm-get-all-versions)   :call npm#get_all_versions('')<CR>
+    nnoremap <Plug>(npm-install)            :call npm#install('')<CR>
 
     if !hasmapto('<Plug>(npm-get-latest-version)')
         nmap <leader>n <Plug>(npm-get-latest-version)
@@ -15,11 +16,17 @@ function! npm#init_mappings() abort
         nmap <leader>N <Plug>(npm-get-all-versions)
     endif
 
-    command! -nargs=1 Npm       call npm#get_latest_version(<f-args>)
-    command! -nargs=1 NpmLatest call npm#get_latest_version(<f-args>)
-    command! -nargs=1 NpmL      call npm#get_latest_version(<f-args>)
-    command! -nargs=1 NpmAll    call npm#get_all_versions(<f-args>)
-    command! -nargs=1 NpmA      call npm#get_all_versions(<f-args>)
+    if !hasmapto('<Plug>(npm-install)')
+        nmap <leader>ni <Plug>(npm-install)
+    endif
+
+    command! -nargs=1 Npm        call npm#get_latest_version(<f-args>)
+    command! -nargs=1 NpmLatest  call npm#get_latest_version(<f-args>)
+    command! -nargs=1 NpmL       call npm#get_latest_version(<f-args>)
+    command! -nargs=1 NpmAll     call npm#get_all_versions(<f-args>)
+    command! -nargs=1 NpmA       call npm#get_all_versions(<f-args>)
+    command! -nargs=? NpmInstall call npm#install(<f-args>)
+    command! -nargs=? NpmI       call npm#install(<f-args>)
 
 	let g:npm_inited = 1
 endfunction
@@ -100,7 +107,7 @@ function! npm#get_version(package_name, option) abort
         if g:npm_cli ==# 'npm'
             let l:param = 'versions --json'
         else
-            let l:param = 'versions'
+            let l:param = 'versions -silent'
         endif
 
         if g:npm_cli ==# 'npm'
@@ -109,23 +116,23 @@ function! npm#get_version(package_name, option) abort
             let l:result = system('yarn info ' . a:package_name . ' ' . l:param)
         endif
 
-        if l:result =~? 'error \|npm ERR! ' || type(l:result) !=# 1
-            echohl ErrorMsg 
-            redraw | echo "Can't get infomation of '" . a:package_name . "'"
-            echohl None
-            return []
+        if type(l:result) !=# 1 || 
+            \ len(matchstr(l:result, 'error Received invalid response from npm.')) > 0 ||
+            \ len(matchstr(l:result, 'npm ERR! ')) > 0
+                echohl ErrorMsg 
+                redraw | echo "Can't get infomation of '" . a:package_name . "'"
+                echohl None
+                return []
         else
-            if g:npm_cli ==# 'npm'
-                " Remove all null character ^@
-                let l:result = substitute(l:result, '[[:cntrl:]]', '', 'g')
-                " Remove all trailing white space
-                let l:result = substitute(l:result, '[ \t]+', '', 'g')
-                " Parse result as list and reverse it
-                let l:result = reverse(eval(l:result))
-
-            else
-                let l:result = reverse(eval(join(split(l:result, '\n')[1:-2], '')))
-            endif
+            " Remove all null character ^@
+            let l:result = substitute(l:result, '[[:cntrl:]]', '', 'g')
+            " Remove all trailing white space
+            let l:result = substitute(l:result, '[ \t]+', '', 'g')
+            " Get data list
+            let l:result = matchstr(l:result, '\[\zs.\+\ze\]')
+            let l:result = '[' . l:result . ']'
+            " Parse and reverse list
+            let l:result = reverse(eval(l:result))
 
             if a:option ==# 'latest'
                 return l:result[0]
@@ -234,6 +241,18 @@ function! s:ClosePopup() abort
     if exists('s:popup_win_id') && !exists('g:npm_disable_autocmd')
         call nvim_win_close(s:popup_win_id, 1)
         unlet s:popup_win_id
+    endif
+endfunction
+" }}}
+
+" npm#install {{{
+function! npm#install(...)
+    let l:package_name = get(a:, 1, '')
+
+    if len(l:package_name) ==# 0
+        echo 'npm install'
+    else
+        echo 'npm install ' . l:package_name
     endif
 endfunction
 " }}}

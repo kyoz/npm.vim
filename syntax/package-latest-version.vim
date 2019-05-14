@@ -3,8 +3,8 @@ if exists('b:current_syntax')
 endif
 
 " Keyword
-syntax match packageVersionKeyword 'Latest: '
+syntax match packageLatestVersionKeyword 'Latest: '
 
-highlight link packageVersionKeyword Function
+highlight link packageLatestVersionKeyword Function
 
 let b:current_syntax = 'package-latest-version'
