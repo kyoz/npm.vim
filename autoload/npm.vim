@@ -36,6 +36,8 @@ endif
 
 " npm#get_latest_version() {{{
 function! npm#get_latest_version(package_name) abort
+    call s:check_init()
+
     let l:package_name = s:get_package_name(a:package_name)
 
     if len(l:package_name) ==# 0 | return | endif
@@ -57,6 +59,8 @@ endfunction
 
 " npm#get_all_versions() {{{
 function! npm#get_all_versions(package_name) abort
+    call s:check_init()
+
     let l:package_name = s:get_package_name(a:package_name)
 
     if len(l:package_name) ==# 0 | return | endif
@@ -93,13 +97,27 @@ endfunction
 
 " npm#install {{{
 function! npm#install(...)
+    call s:check_init()
+
     let l:package_name = get(a:, 1, '')
     let l:directory_type = s:get_directory_type()
 
     if len(l:directory_type) ==# 0
-        echohl ErrorMsg
-        echomsg "Can't find 'package.json' in your cwd"
-        echohl None
+        call s:echo_error("Can't find 'package.json' in your current workspace directory !")
+        return
+    endif
+
+    if g:npm_has_npm ==# 0 && g:npm_has_yarn ==# 0
+        call s:echo_error("Can't find any cli. You have to install npm or yarn in order to perform this command")
+        return
+    endif
+
+    " Check for suitable cli to perform install command
+    if l:directory_type ==# 'npm' && g:npm_has_npm ==# 0
+        call s:echo_error("You must install npm to install package for this project")
+        return
+    elseif l:directory_type ==# 'yarn' && g:npm_has_yarn ==# 0
+        call s:echo_error("You must install yarn to install package for this project")
         return
     endif
 
@@ -119,32 +137,12 @@ function! npm#install(...)
         endif
     endif
 
-    " redraw | echom l:cmd
-    function! OutCallback(self, data) abort
-        if len(matchstr(a:data, '\v^info ')) ==# 0 &&
-            \ len(matchstr(a:data, '\v^warning ')) ==# 0
-            echom '[NPM] ' .  a:data
-        endif
-    endfunction
+    redraw | echo '[NPM] Installing...(with ' . l:directory_type . ')'
 
-    function! ErrCallback(self, data) abort
-        if len(matchstr(a:data, 'no such package available')) > 0
-            echom "[NPM Error] Package doesn't exist"
-        elseif len(matchstr(a:data, "Couldn't find any versions for ")) > 0
-            echom "[NPM Error] Couldn't find any versions"
-        else
-            echom '[NPM Error] ' . a:data
-        endif
-    endfunction
-
-    function! TimeoutCallback(self, data) abort
-        echom '[NPM Timeout] Please check your connection !'
-    endfunction
-    
     let l:execute_job = job_start(l:cmd, {
-        \ 'out_cb': 'OutCallback',
-        \ 'err_cb': 'ErrCallback',
-        \ 'err_timeout': 'TimeoutCallback',
+        \ 'out_cb':      function('s:job_callback_out'),
+        \ 'err_cb':      function('s:job_callback_error'),
+        \ 'exit_cb': function('s:job_callback_exit')
         \ })
 endfunction
 " }}}
@@ -153,25 +151,41 @@ endfunction
 
 " Util Functions {{{
 
+" s:check_init() {{{
+function! s:check_init() abort
+    if !exists('g:npm_cli')
+        execute "normal! :call s:get_cli()\<cr>"
+    endif
+endfunction
+" }}}
+
 " s:get_cli() {{{
 function! s:get_cli() abort
     redraw | echo 'Getting CLI...'
 
-    " Preper yarn cause it's seem faster
-    if executable('yarsn')
+    " Prefer yarn cause it's seem faster
+    let g:npm_has_yarn = 0
+    let g:npm_has_npm = 0
+
+    if executable('yarn')
         let g:npm_cli = 'yarn'
-    elseif executable('npm')
-        let g:npm_cli = 'npm'
+        let g:npm_has_yarn = 1
     endif
+
+    if executable('npm')
+        if !exists('g:npm_cli')
+            let g:npm_cli = 'npm'
+        endif
+
+        let g:npm_has_npm = 1
+    endif
+
+    echo ''
 endfunction
 " }}}
 
 " s:get_package_name() {{{
 function! s:get_package_name(package_name) abort
-    if !exists('g:npm_cli')
-        execute "normal! :call s:get_cli()\<cr>"
-    endif
-
     " set iskeyword to match @,-,/,A-Z, a-z, 0-9
     let l:current_iskeyword = substitute(execute('echo &iskeyword'), '[[:cntrl:]]', '', 'g')
     set iskeyword=@-@,-,/,47,65-90,97-122,48-57
@@ -195,9 +209,7 @@ function! s:get_package_name(package_name) abort
     endif
 
     if l:is_valid_package ==# 0
-        echohl ErrorMsg
-        redraw | echomsg l:package_name . " isn't a valid package name !"
-        echohl None
+        call s:echo_error(l:package_name . " isn't a valid package name !")
         return ''
     endif
 
@@ -211,9 +223,7 @@ endfunction
 "   - 'all': Return all versions of package
 function! s:get_version(package_name, option) abort
     if !exists('g:npm_cli')
-        echohl ErrorMsg
-        redraw | echomsg "You must install npm or yarn for this plugin to work"
-        echohl None
+        call s:echo_error("You must install npm or yarn for this plugin to work")
         return ''
     endif
 
@@ -236,9 +246,7 @@ function! s:get_version(package_name, option) abort
         if type(l:result) !=# 1 || 
             \ len(matchstr(l:result, 'error Received invalid response from npm.')) > 0 ||
             \ len(matchstr(l:result, 'npm ERR! ')) > 0
-                echohl ErrorMsg 
-                redraw | echo "Can't get infomation of '" . a:package_name . "'"
-                echohl None
+                call s:echo_error("Can't get infomation of '" . a:package_name . "'")
                 return []
         else
             " Remove all null character ^@
@@ -258,9 +266,7 @@ function! s:get_version(package_name, option) abort
             endif
         endif
     else
-        echohl ErrorMsg
-        echo 'You must provide a package name !'
-        echohl None
+        call s:echo_error('You must provide a package name !')
     endif
 
     return 0
@@ -270,10 +276,13 @@ endfunction
 " s:get_directory_type() {{{
 function! s:get_directory_type() abort
     if !filereadable(expand(getcwd() . '/package.json'))
-        return 'norm'
+        return ''
+    elseif filereadable(expand(getcwd() . '/package-lock.json'))
+        return 'npm'
     elseif filereadable(expand(getcwd() . '/yarn.lock'))
         return 'yarn'
     else
+        " Can't find package-lock.json and yarn.lock. Assum default is npm
         return 'npm'
     endif
 endfunction
@@ -317,10 +326,91 @@ function! s:ClosePopup() abort
 endfunction
 " }}}
 
+" s:echo_error {{{
+function! s:echo_error(message)
+    if len(a:message) > 0
+        echohl ErrorMsg
+        redraw | echomsg a:message
+        echohl None
+    endif
+endfunction
 " }}}
 
-" TODO:
-" - Update package and all packages feature
-" NOTES:
-" - npm install --save --save-exact package@version
-" - yarn add package@version
+" }}}
+
+" Callback Functions {{{
+
+" s:job_callback_out() {{{
+function! s:job_callback_out(self, data) abort
+    if len(a:data) ==# 0 || get(g:, 'npm_job_has_error', 0)
+        return
+    endif
+
+    if len(matchstr(a:data, '\^info ')) > 0 ||
+        \ len(matchstr(a:data, '^warning ')) > 0 ||
+        \ len(matchstr(a:data, '^found')) > 0
+        return
+    endif
+
+    echom '[NPM] ' .  a:data
+endfunction
+" }}}
+
+" s:job_callback_error() {{{
+function! s:job_callback_error(self, data) abort
+    if len(a:data) ==# 0
+        return
+    endif
+
+    " Filter to get more clearn log.
+    " Currently there is somuch warning and error logs in both yarn and npm
+    " TODO: Learn more about yarn & npm error log
+    if len(matchstr(a:data, 'Not found".$')) > 0 ||
+     \ len(matchstr(a:data, 'The package may be unpublished.$')) > 0 ||
+     \ len(matchstr(a:data, 'no such package available')) > 0 ||
+     \ len(matchstr(a:data, '404 Not Found')) > 0
+        let l:error_msg = "[NPM Error] Package doesn't exist"
+    elseif len(matchstr(a:data, "Couldn't find any versions for ")) > 0
+        let l:error_msg = "[NPM Error] Couldn't find any versions"
+    " Prevent so much unesessary log
+    elseif len(matchstr(a:data, '^npm WARN')) ==# 0 &&
+         \ len(matchstr(a:data, '^warning')) ==# 0 &&
+         \ len(matchstr(a:data, '^npm ERR!')) ==# 0
+            let l:error_msg = '[NPM Error] ' . a:data
+    endif
+
+    if exists('l:error_msg')
+        let g:npm_job_last_error = l:error_msg
+    endif
+endfunction
+" }}}
+
+" s:job_callback_exit() {{{
+function! s:job_callback_exit(self, data) abort
+    if len(get(g:, 'npm_job_last_error', '')) > 0
+        call s:echo_error(g:npm_job_last_error)
+        unlet g:npm_job_last_error
+        return
+    endif
+
+    " Try to refresh package.json buffer
+    let l:package_json_buf = bufwinnr('package.json')
+    let l:current_buf = bufwinnr('%')
+    let l:in_diferrent_buf = l:package_json_buf !=? l:current_buf
+
+    if l:package_json_buf > 0
+        if l:in_diferrent_buf
+            execute l:package_json_buf . 'wincmd w'
+        endif
+
+        execute "silent edit"
+        execute "silent write"
+
+        if l:in_diferrent_buf
+            wincmd p
+        endif
+    endif
+endfunction
+" }}}
+
+" }}}
