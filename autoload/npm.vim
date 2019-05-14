@@ -94,12 +94,58 @@ endfunction
 " npm#install {{{
 function! npm#install(...)
     let l:package_name = get(a:, 1, '')
+    let l:directory_type = s:get_directory_type()
+
+    if len(l:directory_type) ==# 0
+        echohl ErrorMsg
+        echomsg "Can't find 'package.json' in your cwd"
+        echohl None
+        return
+    endif
 
     if len(l:package_name) ==# 0
-        echo 'npm install'
+        " Install all packages
+        if l:directory_type ==# 'npm'
+            let l:cmd = 'npm install'
+        else
+            let l:cmd = 'yarn'
+        endif
     else
-        echo 'npm install ' . l:package_name
+        " Install specific package
+        if l:directory_type ==# 'npm'
+            let l:cmd = 'npm install ' . l:package_name . ' --save --save-exact'
+        else
+            let l:cmd = 'yarn add ' . l:package_name . ' --exact'
+        endif
     endif
+
+    " redraw | echom l:cmd
+    function! OutCallback(self, data) abort
+        if len(matchstr(a:data, '\v^info ')) ==# 0 &&
+            \ len(matchstr(a:data, '\v^warning ')) ==# 0
+            echom '[NPM] ' .  a:data
+        endif
+    endfunction
+
+    function! ErrCallback(self, data) abort
+        if len(matchstr(a:data, 'no such package available')) > 0
+            echom "[NPM Error] Package doesn't exist"
+        elseif len(matchstr(a:data, "Couldn't find any versions for ")) > 0
+            echom "[NPM Error] Couldn't find any versions"
+        else
+            echom '[NPM Error] ' . a:data
+        endif
+    endfunction
+
+    function! TimeoutCallback(self, data) abort
+        echom '[NPM Timeout] Please check your connection !'
+    endfunction
+    
+    let l:execute_job = job_start(l:cmd, {
+        \ 'out_cb': 'OutCallback',
+        \ 'err_cb': 'ErrCallback',
+        \ 'err_timeout': 'TimeoutCallback',
+        \ })
 endfunction
 " }}}
 
@@ -218,6 +264,18 @@ function! s:get_version(package_name, option) abort
     endif
 
     return 0
+endfunction
+" }}}
+
+" s:get_directory_type() {{{
+function! s:get_directory_type() abort
+    if !filereadable(expand(getcwd() . '/package.json'))
+        return 'norm'
+    elseif filereadable(expand(getcwd() . '/yarn.lock'))
+        return 'yarn'
+    else
+        return 'npm'
+    endif
 endfunction
 " }}}
 
