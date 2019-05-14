@@ -16,10 +16,6 @@ function! npm#init_mappings() abort
         nmap <leader>N <Plug>(npm-get-all-versions)
     endif
 
-    if !hasmapto('<Plug>(npm-install)')
-        nmap <leader>ni <Plug>(npm-install)
-    endif
-
     command! -nargs=1 Npm        call npm#get_latest_version(<f-args>)
     command! -nargs=1 NpmLatest  call npm#get_latest_version(<f-args>)
     command! -nargs=1 NpmL       call npm#get_latest_version(<f-args>)
@@ -36,12 +32,87 @@ if !exists('g:npm_inited')
     finish
 endif
 
-" npm#get_cli() {{{
-function! npm#get_cli() abort
+" Main Functions {{{
+
+" npm#get_latest_version() {{{
+function! npm#get_latest_version(package_name) abort
+    let l:package_name = s:get_package_name(a:package_name)
+
+    if len(l:package_name) ==# 0 | return | endif
+
+    let l:result = s:get_version(l:package_name, 'latest')
+
+    if len(l:result) ==# 0
+        return
+    endif
+
+    " Try to show float-preview if using nvim
+    if has('nvim-0.4.0') && get(g:, 'npm_allow_floating_window', 1)
+        call s:open_floating_window(' Latest: ' . l:result . ' ')
+    else
+        redraw | echom "Latest version of '" . l:package_name . "': " . l:result
+    endif
+endfunction
+" }}}
+
+" npm#get_all_versions() {{{
+function! npm#get_all_versions(package_name) abort
+    let l:package_name = s:get_package_name(a:package_name)
+
+    if len(l:package_name) ==# 0 | return | endif
+
+    let l:result = s:get_version(l:package_name, 'all')
+
+    if len(l:result) ==# 0
+        return
+    endif
+
+    let l:buffer_index = bufwinnr('__packages_versions__')
+
+    if l:buffer_index > 0
+        execute l:buffer_index . 'wincmd w'
+    else
+        rightbelow 50vsplit __packages_versions__
+    endif
+
+    setlocal modifiable
+
+    normal! ggdG
+    setlocal filetype=package-versions
+    setlocal buftype=nofile
+
+    call append(0, 'Package: ' . l:package_name)
+    call append(2, '[')
+    call append(3, map(l:result, '"    " . v:val . ""'))
+    call append(len(l:result) + 3, ']')
+
+    setlocal nomodifiable
+    normal! gg
+endfunction
+" }}}
+
+" npm#install {{{
+function! npm#install(...)
+    let l:package_name = get(a:, 1, '')
+
+    if len(l:package_name) ==# 0
+        echo 'npm install'
+    else
+        echo 'npm install ' . l:package_name
+    endif
+endfunction
+" }}}
+
+" }}}
+
+" Util Functions {{{
+
+" s:get_cli() {{{
+function! s:get_cli() abort
     redraw | echo 'Getting CLI...'
 
     " Preper yarn cause it's seem faster
-    if executable('yarn')
+    if executable('yarsn')
         let g:npm_cli = 'yarn'
     elseif executable('npm')
         let g:npm_cli = 'npm'
@@ -49,10 +120,10 @@ function! npm#get_cli() abort
 endfunction
 " }}}
 
-" npm#get_package_name() {{{
-function! npm#get_package_name(package_name) abort
+" s:get_package_name() {{{
+function! s:get_package_name(package_name) abort
     if !exists('g:npm_cli')
-        execute "normal! :call npm#get_cli()\<cr>"
+        execute "normal! :call s:get_cli()\<cr>"
     endif
 
     " set iskeyword to match @,-,/,A-Z, a-z, 0-9
@@ -88,11 +159,11 @@ function! npm#get_package_name(package_name) abort
 endfunction
 " }}}
 
-" npm#get_version() {{{
+" s:get_version() {{{
 " option: 'latest' | 'all'
 "   - 'latest': Return only the latest version of package
 "   - 'all': Return all versions of package
-function! npm#get_version(package_name, option) abort
+function! s:get_version(package_name, option) abort
     if !exists('g:npm_cli')
         echohl ErrorMsg
         redraw | echomsg "You must install npm or yarn for this plugin to work"
@@ -150,65 +221,8 @@ function! npm#get_version(package_name, option) abort
 endfunction
 " }}}
 
-" npm#get_latest_version() {{{
-function! npm#get_latest_version(package_name) abort
-    let l:package_name = npm#get_package_name(a:package_name)
-
-    if len(l:package_name) ==# 0 | return | endif
-
-    let l:result = npm#get_version(l:package_name, 'latest')
-
-    if len(l:result) ==# 0
-        return
-    endif
-
-    " Try to show float-preview if using nvim
-    if has('nvim-0.4.0') && get(g:, 'npm_allow_floating_window', 1)
-        call npm#open_floating_window(' Latest: ' . l:result . ' ')
-    else
-        redraw | echom "Latest version of '" . l:package_name . "': " . l:result
-    endif
-endfunction
-" }}}
-
-" npm#get_all_versions() {{{
-function! npm#get_all_versions(package_name) abort
-    let l:package_name = npm#get_package_name(a:package_name)
-
-    if len(l:package_name) ==# 0 | return | endif
-
-    let l:result = npm#get_version(l:package_name, 'all')
-
-    if len(l:result) ==# 0
-        return
-    endif
-
-    let l:buffer_index = bufwinnr('__packages_versions__')
-
-    if l:buffer_index > 0
-        execute l:buffer_index . 'wincmd w'
-    else
-        rightbelow 50vsplit __packages_versions__
-    endif
-
-    setlocal modifiable
-
-    normal! ggdG
-    setlocal filetype=package-versions
-    setlocal buftype=nofile
-
-    call append(0, 'Package: ' . l:package_name)
-    call append(2, '[')
-    call append(3, map(l:result, '"    " . v:val . ""'))
-    call append(len(l:result) + 3, ']')
-
-    setlocal nomodifiable
-    normal! gg
-endfunction
-" }}}
-
-" npm#open_floating_window() {{{
-function! npm#open_floating_window(content) abort
+" s:open_floating_window() {{{
+function! s:open_floating_window(content) abort
     redraw | echo ''
     let buf = nvim_create_buf(v:false, v:true)
     call nvim_buf_set_lines(buf, 0, -1, v:true, [a:content])
@@ -245,16 +259,6 @@ function! s:ClosePopup() abort
 endfunction
 " }}}
 
-" npm#install {{{
-function! npm#install(...)
-    let l:package_name = get(a:, 1, '')
-
-    if len(l:package_name) ==# 0
-        echo 'npm install'
-    else
-        echo 'npm install ' . l:package_name
-    endif
-endfunction
 " }}}
 
 " TODO:
