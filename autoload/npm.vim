@@ -89,21 +89,21 @@ function! npm#install(...)
     if len(l:package_name) ==# 0
         " Install all packages
         if l:directory_type ==# 'npm'
-            let l:cmd = 'npm install'
+            let l:cmd = ['npm install']
         else
-            let l:cmd = 'yarn'
+            let l:cmd = ['yarn']
         endif
     else
         " Install specific package
         if l:directory_type ==# 'npm'
-            let l:cmd = 'npm install ' . l:package_name . ' --save --save-exact'
+            let l:cmd = ['npm install ' . l:package_name . ' --save --save-exact']
         else
-            let l:cmd = 'yarn add ' . l:package_name . ' --exact'
+            let l:cmd = ['yarn add ' . l:package_name . ' --exact']
         endif
     endif
 
     redraw | echo '[NPM] Installing...(with ' . l:directory_type . ')'
-    
+
     let l:job_name = len(l:package_name) ==# 0 ? 'npm-install' : 'npm-install-dep'
     call s:execute_command(l:cmd, l:job_name)
 endfunction
@@ -446,6 +446,7 @@ function! s:job_callback_error(self, data) abort
         \ len(matchstr(a:data, '^warning')) ==# 0 &&
         \ len(matchstr(a:data, '^npm ERR!')) ==# 0 &&
         \ len(matchstr(a:data, '^npm')) ==# 0 &&
+        \ len(matchstr(a:data, 'WARN')) ==# 0 &&
         \ len(matchstr(a:data, 'notice')) ==# 0 &&
         \ len(matchstr(a:data, 'lockfile')) ==# 0
             let l:error_msg = '[NPM Error] ' . a:data
