@@ -337,11 +337,19 @@ function! s:execute_command(cmd, type)
 
     let g:npm_job_type = a:type
     
-    let l:execute_job = job_start(a:cmd, {
-        \ 'out_cb':      function('s:job_callback_out'),
-        \ 'err_cb':      function('s:job_callback_error'),
-        \ 'exit_cb': function('s:job_callback_exit')
-        \ })
+    if has('nvim')
+        let l:execute_job = jobstart(a:cmd, {
+            \ 'out_cb':      function('s:job_callback_out'),
+            \ 'err_cb':      function('s:job_callback_error'),
+            \ 'exit_cb': function('s:job_callback_exit')
+            \ })
+    else
+        let l:execute_job = job_start(a:cmd, {
+            \ 'out_cb':      function('s:job_callback_out'),
+            \ 'err_cb':      function('s:job_callback_error'),
+            \ 'exit_cb': function('s:job_callback_exit')
+            \ })
+    endif
 endfunction
 " }}}
 
