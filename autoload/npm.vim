@@ -375,7 +375,8 @@ function! s:job_callback_error(self, data) abort
     " Prevent so much unesessary log
     elseif len(matchstr(a:data, '^npm WARN')) ==# 0 &&
          \ len(matchstr(a:data, '^warning')) ==# 0 &&
-         \ len(matchstr(a:data, '^npm ERR!')) ==# 0
+         \ len(matchstr(a:data, '^npm ERR!')) ==# 0 &&
+         \ len(matchstr(a:data, '^npm notice created a lockfile')) ==# 0
             let l:error_msg = '[NPM Error] ' . a:data
     endif
 
