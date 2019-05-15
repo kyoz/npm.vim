@@ -59,14 +59,14 @@ function! npm#init(...) abort
     endif
 
     if l:cli ==# 'yarn'
-        let l:cmd = 'bash -c "yarn init --yes && yarn"'
+        let l:cmd = ['yarn init --yes', 'yarn']
     else
-        let l:cmd = 'bash -c "npm init --yes && npm install"'
+        let l:cmd = ['npm init --yes', 'npm install']
     endif
 
     redraw | echo '[NPM] Initing...(with ' . l:cli . ')'
 
-    call s:execute_command(escape(l:cmd, '&'), 'npm-init')
+    call s:execute_command(l:cmd, 'npm-init')
 endfunction
 " }}}
 
@@ -336,17 +336,17 @@ function! s:execute_command(cmd, type)
     if !exists('a:cmd') | return | endif
 
     let g:npm_job_type = a:type
-    
+
     if has('nvim')
-        let l:execute_job = jobstart(a:cmd, {
-            \ 'out_cb':      function('s:job_callback_out'),
-            \ 'err_cb':      function('s:job_callback_error'),
-            \ 'exit_cb': function('s:job_callback_exit')
-            \ })
+        let l:execute_job = jobstart(['bash', '-c', join(a:cmd, ';')] , extend({'shell': 'shell 1'}, {
+            \ 'on_stdout': function('s:nvim_job_callback_wrapper'),
+            \ 'on_stderr': function('s:nvim_job_callback_wrapper'),
+            \ 'on_exit':   function('s:nvim_job_callback_wrapper')
+            \ }))
     else
-        let l:execute_job = job_start(a:cmd, {
-            \ 'out_cb':      function('s:job_callback_out'),
-            \ 'err_cb':      function('s:job_callback_error'),
+        let l:execute_job = job_start('bash -c ' . '"' . join(a:cmd, ' && ') . '"', {
+            \ 'out_cb':  function('s:job_callback_out'),
+            \ 'err_cb':  function('s:job_callback_error'),
             \ 'exit_cb': function('s:job_callback_exit')
             \ })
     endif
@@ -441,10 +441,13 @@ function! s:job_callback_error(self, data) abort
     elseif len(matchstr(a:data, "Couldn't find any versions for ")) > 0
         let l:error_msg = "[NPM Error] Couldn't find any versions"
     " Prevent so much unesessary log
-    elseif len(matchstr(a:data, '^npm WARN')) ==# 0 &&
-         \ len(matchstr(a:data, '^warning')) ==# 0 &&
-         \ len(matchstr(a:data, '^npm ERR!')) ==# 0 &&
-         \ len(matchstr(a:data, '^npm notice created a lockfile')) ==# 0
+    elseif len(substitute(a:data, '[ \t]+', '', 'g')) > 0 &&
+        \ len(matchstr(a:data, '^npm WARN')) ==# 0 &&
+        \ len(matchstr(a:data, '^warning')) ==# 0 &&
+        \ len(matchstr(a:data, '^npm ERR!')) ==# 0 &&
+        \ len(matchstr(a:data, '^npm')) ==# 0 &&
+        \ len(matchstr(a:data, 'notice')) ==# 0 &&
+        \ len(matchstr(a:data, 'lockfile')) ==# 0
             let l:error_msg = '[NPM Error] ' . a:data
     endif
 
@@ -494,13 +497,25 @@ function! s:job_callback_exit(self, data) abort
         if len(filter(range(1, bufnr('$')), 'buflisted(v:val)')) > 1
             rightbelow vsplit package.json
         else
-            open package.json
+            edit package.json
         endif
         redraw | echo "[NPM] Project inited."
 
     endif
 
     unlet g:npm_job_type
+endfunction
+" }}}
+
+" s:nvim_job_callback_wrapper(job_id, data, event) {{{
+function! s:nvim_job_callback_wrapper(job_id, data, event)
+    if a:event ==# 'stdout'
+        call s:job_callback_out(a:event, a:data[0])
+    elseif a:event ==# 'stderr'
+        call s:job_callback_error(a:event, a:data[0])
+    elseif a:event ==# 'exit'
+        call s:job_callback_exit(a:event, a:data[0])
+    endif
 endfunction
 " }}}
 
