@@ -23,6 +23,7 @@ function! npm#init_mappings() abort
     command! -nargs=1 NpmA       call npm#get_all_versions(<f-args>)
     command! -nargs=? NpmInstall call npm#install(<f-args>)
     command! -nargs=? NpmI       call npm#install(<f-args>)
+    command! -nargs=? NpmInit    call npm#init(<f-args>)
 
 	let g:npm_inited = 1
 endfunction
@@ -34,7 +35,80 @@ endif
 
 " Main Functions {{{
 
-" npm#get_latest_version() {{{
+" npm#init() {{{
+function! npm#init(...) abort
+    call s:check_init()
+
+    let l:choosed_cli = get(a:, 1, '')
+
+    if len(l:choosed_cli) > 0 && l:choosed_cli !=# '--npm' && l:choosed_cli !=# '--yarn'
+        call s:echo_error("[NPM Error] Invalid arguments") | return
+    endif
+
+    if len(s:get_directory_type()) > 0
+        call s:echo_error("[NPM Error] Current workspace has been inited before !")
+        return
+    endif
+
+    let l:cli = l:choosed_cli ==# '--npm' ? 'npm' :
+        \ l:choosed_cli ==# '--yarn' ? 'yarn' :
+        \ 'npm'
+
+    if s:have_suitable_cli(l:cli) == v:false
+        return
+    endif
+
+    if l:cli ==# 'yarn'
+        let l:cmd = 'yarn init --yes && yarn'
+    else
+        let l:cmd = 'npm init --yes && npm install'
+    endif
+
+    redraw | echo '[NPM] Initing...(with ' . l:cli . ')'
+
+    call s:execute_command(l:cmd, 'npm-init')
+endfunction
+" }}}
+
+" npm#install(...) {{{
+function! npm#install(...)
+    call s:check_init()
+
+    let l:package_name = get(a:, 1, '')
+    let l:directory_type = s:get_directory_type()
+
+    if len(l:directory_type) ==# 0
+        call s:echo_error("[NPM Error] Can't find 'package.json' in your current workspace directory !")
+        return
+    endif
+
+    if s:have_suitable_cli(l:directory_type) == v:false
+        return
+    endif
+
+    if len(l:package_name) ==# 0
+        " Install all packages
+        if l:directory_type ==# 'npm'
+            let l:cmd = 'npm install'
+        else
+            let l:cmd = 'yarn'
+        endif
+    else
+        " Install specific package
+        if l:directory_type ==# 'npm'
+            let l:cmd = 'npm install ' . l:package_name . ' --save --save-exact'
+        else
+            let l:cmd = 'yarn add ' . l:package_name . ' --exact'
+        endif
+    endif
+
+    redraw | echo '[NPM] Installing...(with ' . l:directory_type . ')'
+    
+    call s:execute_command(l:cmd, 'npm-install')
+endfunction
+" }}}
+
+" npm#get_latest_version(package_name) {{{
 function! npm#get_latest_version(package_name) abort
     call s:check_init()
 
@@ -57,7 +131,7 @@ function! npm#get_latest_version(package_name) abort
 endfunction
 " }}}
 
-" npm#get_all_versions() {{{
+" npm#get_all_versions(package_name) {{{
 function! npm#get_all_versions(package_name) abort
     call s:check_init()
 
@@ -92,58 +166,6 @@ function! npm#get_all_versions(package_name) abort
 
     setlocal nomodifiable
     normal! gg
-endfunction
-" }}}
-
-" npm#install {{{
-function! npm#install(...)
-    call s:check_init()
-
-    let l:package_name = get(a:, 1, '')
-    let l:directory_type = s:get_directory_type()
-
-    if len(l:directory_type) ==# 0
-        call s:echo_error("Can't find 'package.json' in your current workspace directory !")
-        return
-    endif
-
-    if g:npm_has_npm ==# 0 && g:npm_has_yarn ==# 0
-        call s:echo_error("Can't find any cli. You have to install npm or yarn in order to perform this command")
-        return
-    endif
-
-    " Check for suitable cli to perform install command
-    if l:directory_type ==# 'npm' && g:npm_has_npm ==# 0
-        call s:echo_error("You must install npm to install package for this project")
-        return
-    elseif l:directory_type ==# 'yarn' && g:npm_has_yarn ==# 0
-        call s:echo_error("You must install yarn to install package for this project")
-        return
-    endif
-
-    if len(l:package_name) ==# 0
-        " Install all packages
-        if l:directory_type ==# 'npm'
-            let l:cmd = 'npm install'
-        else
-            let l:cmd = 'yarn'
-        endif
-    else
-        " Install specific package
-        if l:directory_type ==# 'npm'
-            let l:cmd = 'npm install ' . l:package_name . ' --save --save-exact'
-        else
-            let l:cmd = 'yarn add ' . l:package_name . ' --exact'
-        endif
-    endif
-
-    redraw | echo '[NPM] Installing...(with ' . l:directory_type . ')'
-
-    let l:execute_job = job_start(l:cmd, {
-        \ 'out_cb':      function('s:job_callback_out'),
-        \ 'err_cb':      function('s:job_callback_error'),
-        \ 'exit_cb': function('s:job_callback_exit')
-        \ })
 endfunction
 " }}}
 
@@ -184,7 +206,7 @@ function! s:get_cli() abort
 endfunction
 " }}}
 
-" s:get_package_name() {{{
+" s:get_package_name(package_name) {{{
 function! s:get_package_name(package_name) abort
     " set iskeyword to match @,-,/,A-Z, a-z, 0-9
     let l:current_iskeyword = substitute(execute('echo &iskeyword'), '[[:cntrl:]]', '', 'g')
@@ -217,7 +239,7 @@ function! s:get_package_name(package_name) abort
 endfunction
 " }}}
 
-" s:get_version() {{{
+" s:get_version(package_name, option) {{{
 " option: 'latest' | 'all'
 "   - 'latest': Return only the latest version of package
 "   - 'all': Return all versions of package
@@ -288,7 +310,41 @@ function! s:get_directory_type() abort
 endfunction
 " }}}
 
-" s:open_floating_window() {{{
+" s:have_suitable_cli(project_type) {{{
+function! s:have_suitable_cli(project_type) abort
+    if g:npm_has_npm ==# 0 && g:npm_has_yarn ==# 0
+        call s:echo_error("[NPM Error] Can't find any cli. You have to install npm or yarn in order to perform this command")
+        return v:false
+    endif
+
+    " Check for suitable cli to perform install command
+    if a:project_type ==# 'npm' && g:npm_has_npm ==# 0
+        call s:echo_error("[NPM Error] You must install npm to perform this command")
+        return v:false
+    elseif a:project_type ==# 'yarn' && g:npm_has_yarn ==# 0
+        call s:echo_error("[NPM Error] You must install yarn to perform this command")
+        return v:false
+    endif
+
+    return v:true
+endfunction
+" }}}
+
+" s:execute_command(cmd) {{{ abort
+function! s:execute_command(cmd, type)
+    if !exists('a:cmd') | return | endif
+
+    let g:npm_job_type = a:type
+    
+    let l:execute_job = job_start(a:cmd, {
+        \ 'out_cb':      function('s:job_callback_out'),
+        \ 'err_cb':      function('s:job_callback_error'),
+        \ 'exit_cb': function('s:job_callback_exit')
+        \ })
+endfunction
+" }}}
+
+" s:open_floating_window(content) {{{
 function! s:open_floating_window(content) abort
     redraw | echo ''
     let buf = nvim_create_buf(v:false, v:true)
@@ -326,7 +382,7 @@ function! s:ClosePopup() abort
 endfunction
 " }}}
 
-" s:echo_error {{{
+" s:echo_error(message) {{{
 function! s:echo_error(message)
     if len(a:message) > 0
         echohl ErrorMsg
@@ -340,7 +396,7 @@ endfunction
 
 " Callback Functions {{{
 
-" s:job_callback_out() {{{
+" s:job_callback_out(self, data) {{{
 function! s:job_callback_out(self, data) abort
     if len(a:data) ==# 0 || get(g:, 'npm_job_has_error', 0)
         return
@@ -356,7 +412,7 @@ function! s:job_callback_out(self, data) abort
 endfunction
 " }}}
 
-" s:job_callback_error() {{{
+" s:job_callback_error(self, data) {{{
 function! s:job_callback_error(self, data) abort
     if len(a:data) ==# 0
         return
@@ -386,7 +442,7 @@ function! s:job_callback_error(self, data) abort
 endfunction
 " }}}
 
-" s:job_callback_exit() {{{
+" s:job_callback_exit(self, data) {{{
 function! s:job_callback_exit(self, data) abort
     if len(get(g:, 'npm_job_last_error', '')) > 0
         call s:echo_error(g:npm_job_last_error)
