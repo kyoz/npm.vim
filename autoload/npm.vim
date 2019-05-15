@@ -59,14 +59,14 @@ function! npm#init(...) abort
     endif
 
     if l:cli ==# 'yarn'
-        let l:cmd = 'yarn init --yes && yarn'
+        let l:cmd = 'bash -c "yarn init --yes && yarn"'
     else
-        let l:cmd = 'npm init --yes && npm install'
+        let l:cmd = 'bash -c "npm init --yes && npm install"'
     endif
 
     redraw | echo '[NPM] Initing...(with ' . l:cli . ')'
 
-    call s:execute_command(l:cmd, 'npm-init')
+    call s:execute_command(escape(l:cmd, '&'), 'npm-init')
 endfunction
 " }}}
 
@@ -104,7 +104,8 @@ function! npm#install(...)
 
     redraw | echo '[NPM] Installing...(with ' . l:directory_type . ')'
     
-    call s:execute_command(l:cmd, 'npm-install')
+    let l:job_name = len(l:package_name) ==# 0 ? 'npm-install' : 'npm-install-dep'
+    call s:execute_command(l:cmd, l:job_name)
 endfunction
 " }}}
 
@@ -404,7 +405,10 @@ function! s:job_callback_out(self, data) abort
 
     if len(matchstr(a:data, '\^info ')) > 0 ||
         \ len(matchstr(a:data, '^warning ')) > 0 ||
-        \ len(matchstr(a:data, '^found')) > 0
+        \ len(matchstr(a:data, '^found')) > 0 ||
+        \ len(matchstr(a:data, '^{')) > 0 ||
+        \ len(matchstr(a:data, '^ }')) > 0 ||
+        \ len(matchstr(a:data, '^  "') > 0)
         return
     endif
 
@@ -450,23 +454,45 @@ function! s:job_callback_exit(self, data) abort
         return
     endif
 
-    " Try to refresh package.json buffer
-    let l:package_json_buf = bufwinnr('package.json')
-    let l:current_buf = bufwinnr('%')
-    let l:in_diferrent_buf = l:package_json_buf !=? l:current_buf
+    if g:npm_job_type ==# 'npm-install' || g:npm_job_type ==# 'npm-install-dep'
 
-    if l:package_json_buf > 0
-        if l:in_diferrent_buf
-            execute l:package_json_buf . 'wincmd w'
+        " Try to refresh package.json buffer
+        let l:package_json_buf = bufwinnr('package.json')
+        let l:current_buf = bufwinnr('%')
+        let l:in_diferrent_buf = l:package_json_buf !=? l:current_buf
+
+        if l:package_json_buf > 0
+            if l:in_diferrent_buf
+                execute l:package_json_buf . 'wincmd w'
+            endif
+
+            execute "silent edit"
+            execute "silent write"
+
+            if l:in_diferrent_buf
+                wincmd p
+            endif
         endif
 
-        execute "silent edit"
-        execute "silent write"
-
-        if l:in_diferrent_buf
-            wincmd p
+        if g:npm_job_type ==# 'npm-install'
+            redraw | echo "[NPM] Installed all dependenies." 
+        elseif g:npm_job_type ==# 'npm-install-dep'
+            redraw | echo "[NPM] Installed"
         endif
+
+    elseif g:npm_job_type ==# 'npm-init'
+
+        " Open package.json buf
+        if len(filter(range(1, bufnr('$')), 'buflisted(v:val)')) > 1
+            rightbelow vsplit package.json
+        else
+            open package.json
+        endif
+        redraw | echo "[NPM] Project inited."
+
     endif
+
+    unlet g:npm_job_type
 endfunction
 " }}}
 
