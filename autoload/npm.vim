@@ -16,14 +16,16 @@ function! npm#init_mappings() abort
         nmap <leader>N <Plug>(npm-get-all-versions)
     endif
 
-    command! -nargs=1 Npm        call npm#get_latest_version(<f-args>)
-    command! -nargs=1 NpmLatest  call npm#get_latest_version(<f-args>)
-    command! -nargs=1 NpmL       call npm#get_latest_version(<f-args>)
-    command! -nargs=1 NpmAll     call npm#get_all_versions(<f-args>)
-    command! -nargs=1 NpmA       call npm#get_all_versions(<f-args>)
-    command! -nargs=* NpmInstall call npm#install(<f-args>)
-    command! -nargs=* NpmI       call npm#install(<f-args>)
-    command! -nargs=? NpmInit    call npm#init(<f-args>)
+    command! -nargs=1 Npm          call npm#get_latest_version(<f-args>)
+    command! -nargs=1 NpmLatest    call npm#get_latest_version(<f-args>)
+    command! -nargs=1 NpmL         call npm#get_latest_version(<f-args>)
+    command! -nargs=1 NpmAll       call npm#get_all_versions(<f-args>)
+    command! -nargs=1 NpmA         call npm#get_all_versions(<f-args>)
+    command! -nargs=* NpmInstall   call npm#install(<f-args>)
+    command! -nargs=* NpmI         call npm#install(<f-args>)
+    command! -nargs=? NpmInit      call npm#init(<f-args>)
+    command! -nargs=1 NpmUninstall call npm#uninstall(<f-args>)
+    command! -nargs=1 NpmU         call npm#uninstall(<f-args>)
 
 	let g:npm_inited = 1
 endfunction
@@ -127,6 +129,37 @@ function! npm#install(...)
 
     call s:execute_command([l:cmd], l:job_name)
 endfunction
+" }}}
+
+" npm#uninstall(...) {{{
+
+function! npm#uninstall(...) abort
+    call s:check_init()
+
+    let l:package_name = get(a:, 1, '')
+    let l:directory_type = s:get_directory_type()
+
+    if len(l:directory_type) ==# 0
+        call s:echo_error("[NPM Error] Can't find 'package.json' in your current workspace directory !")
+        return
+    endif
+
+    if s:have_suitable_cli(l:directory_type) == v:false
+        return
+    endif
+
+    " Install all packages
+    if l:directory_type ==# 'npm'
+        let l:cmd = 'npm uninstall ' . l:package_name
+    else
+        let l:cmd = 'yarn remove ' . l:package_name
+    endif
+
+    redraw | echo "[NPM] Removing '" . l:package_name . "'...(with " . l:directory_type . ")"
+
+    call s:execute_command([l:cmd], 'npm-uninstall')
+endfunction
+
 " }}}
 
 " npm#get_latest_version(package_name) {{{
@@ -488,7 +521,8 @@ function! s:job_callback_exit(self, data) abort
 
     if g:npm_job_type ==# 'npm-install' ||
         \ g:npm_job_type ==# 'npm-install-dep' ||
-        \ g:npm_job_type ==# 'npm-install-dev'
+        \ g:npm_job_type ==# 'npm-install-dev' ||
+        \ g:npm_job_type ==# 'npm-uninstall'
 
         " npm-install {{{
         " Try to refresh package.json buffer
@@ -513,6 +547,8 @@ function! s:job_callback_exit(self, data) abort
             redraw | echo "[NPM] Installed all dependenies." 
         elseif g:npm_job_type ==# 'npm-install-dep' || g:npm_job_type ==# 'npm-install-dev'
             redraw | echo "[NPM] Installed"
+        elseif g:npm_job_type ==# 'npm-uninstall'
+            redraw | echo "[NPM] Removed"
         endif
         " }}}
 
