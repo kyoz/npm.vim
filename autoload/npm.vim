@@ -21,8 +21,8 @@ function! npm#init_mappings() abort
     command! -nargs=1 NpmL       call npm#get_latest_version(<f-args>)
     command! -nargs=1 NpmAll     call npm#get_all_versions(<f-args>)
     command! -nargs=1 NpmA       call npm#get_all_versions(<f-args>)
-    command! -nargs=? NpmInstall call npm#install(<f-args>)
-    command! -nargs=? NpmI       call npm#install(<f-args>)
+    command! -nargs=* NpmInstall call npm#install(<f-args>)
+    command! -nargs=* NpmI       call npm#install(<f-args>)
     command! -nargs=? NpmInit    call npm#init(<f-args>)
 
 	let g:npm_inited = 1
@@ -75,10 +75,16 @@ function! npm#install(...)
     call s:check_init()
 
     let l:package_name = get(a:, 1, '')
+    let l:is_dev_depenency = get(a:, 2, '')
     let l:directory_type = s:get_directory_type()
 
     if len(l:directory_type) ==# 0
         call s:echo_error("[NPM Error] Can't find 'package.json' in your current workspace directory !")
+        return
+    endif
+
+    if a:0 > 1 && l:is_dev_depenency !=# '--dev'
+        call s:echo_error("[NPM Error] Invalid arguments !")
         return
     endif
 
@@ -89,23 +95,37 @@ function! npm#install(...)
     if len(l:package_name) ==# 0
         " Install all packages
         if l:directory_type ==# 'npm'
-            let l:cmd = ['npm install']
+            let l:cmd = 'npm install'
         else
-            let l:cmd = ['yarn']
+            let l:cmd = 'yarn'
         endif
     else
         " Install specific package
         if l:directory_type ==# 'npm'
-            let l:cmd = ['npm install ' . l:package_name . ' --save --save-exact']
+            let l:cmd  = 'npm install ' . l:package_name
+            let l:cmd .= l:is_dev_depenency ==# '--dev' ? ' --save-dev' : ' --save'
+            let l:cmd .= ' --save-exact'
         else
-            let l:cmd = ['yarn add ' . l:package_name . ' --exact']
+            let l:cmd  = 'yarn add ' . l:package_name
+            let l:cmd .= l:is_dev_depenency ==# '--dev' ? ' --dev' : ' --save'
+            let l:cmd .= ' --exact'
         endif
     endif
 
-    redraw | echo '[NPM] Installing...(with ' . l:directory_type . ')'
+    if len(l:package_name) ==# 0
+        let l:job_name    = 'npm-install'
+        let l:install_msg = '[NPM] Installing...(with ' . l:directory_type . ')'
+    elseif l:is_dev_depenency ==# '--dev'
+        let l:job_name = 'npm-install-dev'
+        let l:install_msg = '[NPM] Installing dev dependency...(with ' . l:directory_type . ')'
+    else
+        let l:job_name = 'npm-install-dep'
+        let l:install_msg = '[NPM] Installing dependency...(with ' . l:directory_type . ')'
+    endif
 
-    let l:job_name = len(l:package_name) ==# 0 ? 'npm-install' : 'npm-install-dep'
-    call s:execute_command(l:cmd, l:job_name)
+    redraw | echo l:install_msg
+
+    call s:execute_command([l:cmd], l:job_name)
 endfunction
 " }}}
 
@@ -466,8 +486,11 @@ function! s:job_callback_exit(self, data) abort
         return
     endif
 
-    if g:npm_job_type ==# 'npm-install' || g:npm_job_type ==# 'npm-install-dep'
+    if g:npm_job_type ==# 'npm-install' ||
+        \ g:npm_job_type ==# 'npm-install-dep' ||
+        \ g:npm_job_type ==# 'npm-install-dev'
 
+        " npm-install {{{
         " Try to refresh package.json buffer
         let l:package_json_buf = bufwinnr('package.json')
         let l:current_buf = bufwinnr('%')
@@ -488,12 +511,14 @@ function! s:job_callback_exit(self, data) abort
 
         if g:npm_job_type ==# 'npm-install'
             redraw | echo "[NPM] Installed all dependenies." 
-        elseif g:npm_job_type ==# 'npm-install-dep'
+        elseif g:npm_job_type ==# 'npm-install-dep' || g:npm_job_type ==# 'npm-install-dev'
             redraw | echo "[NPM] Installed"
         endif
+        " }}}
 
     elseif g:npm_job_type ==# 'npm-init'
 
+        " npm-init {{{
         " Open package.json buf
         if len(filter(range(1, bufnr('$')), 'buflisted(v:val)')) > 1
             rightbelow vsplit package.json
@@ -501,6 +526,7 @@ function! s:job_callback_exit(self, data) abort
             edit package.json
         endif
         redraw | echo "[NPM] Project inited."
+        " }}}
 
     endif
 
