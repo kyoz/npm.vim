@@ -147,7 +147,7 @@ function! npm#get_latest_version(package_name) abort
     if has('nvim-0.4.0') && get(g:, 'npm_allow_floating_window', 1)
         call s:open_floating_window(' Latest: ' . l:result . ' ')
     else
-        redraw | echom "Latest version of '" . l:package_name . "': " . l:result
+        redraw | echom "[NPM] Latest version of '" . l:package_name . "': " . l:result
     endif
 endfunction
 " }}}
@@ -204,7 +204,7 @@ endfunction
 
 " s:get_cli() {{{
 function! s:get_cli() abort
-    redraw | echo 'Getting CLI...'
+    redraw | echo '[NPM] Getting CLI...'
 
     " Prefer yarn cause it's seem faster
     let g:npm_has_yarn = 0
@@ -266,13 +266,13 @@ endfunction
 "   - 'all': Return all versions of package
 function! s:get_version(package_name, option) abort
     if !exists('g:npm_cli')
-        call s:echo_error("You must install npm or yarn for this plugin to work")
+        call s:echo_error("[NPM] You must install npm or yarn for this plugin to work")
         return ''
     endif
 
     if len(a:package_name) > 0
 
-        redraw! | echo 'Getting ' . a:package_name . ' infomation... (with ' . g:npm_cli . ')'
+        redraw! | echo '[NPM] Getting ' . a:package_name . ' infomation... (with ' . g:npm_cli . ')'
 
         if g:npm_cli ==# 'npm'
             let l:param = 'versions --json'
@@ -309,7 +309,7 @@ function! s:get_version(package_name, option) abort
             endif
         endif
     else
-        call s:echo_error('You must provide a package name !')
+        call s:echo_error('[NPM] You must provide a package name !')
     endif
 
     return 0
