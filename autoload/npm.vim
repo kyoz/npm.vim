@@ -504,7 +504,8 @@ function! s:job_callback_error(self, data) abort
         \ len(matchstr(a:data, 'lockfile')) ==# 0 &&
         \ len(matchstr(a:data, 'No description')) ==# 0 &&
         \ len(matchstr(a:data, 'No repository')) ==# 0 &&
-        \ len(matchstr(a:data, 'enoent SKIPPING')) ==# 0
+        \ len(matchstr(a:data, 'enoent')) ==# 0 &&
+        \ len(matchstr(a:data, 'SKIPPING')) ==# 0
             let l:error_msg = '[NPM Error] ' . a:data
     endif
 
