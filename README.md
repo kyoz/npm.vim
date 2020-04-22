@@ -16,7 +16,7 @@ It will auto detech and use which package manage you have installed (Prefer yarn
 Install with Vim Plug, other plugin managers is similar.
 
 ```
-Plug 'banminkyoz/npm.vim'
+Plug 'kyoz/npm.vim'
 ```
 
 ## Usage
