@@ -8,18 +8,66 @@
                                  |_|               ~
                                       ~ Npm in Vim !
 
+================================================================================
+CONTENTS                                                          *npm-contents*
+
+     1. Intro.............................................|npm-intro|
+     2. Commands..........................................|npm-commands|
+     3. Mappings..........................................|npm-mappings|
+     4. License...........................................|npm-license|
+
+================================================================================
+INTRO                                                                *npm-intro*
+
+Provide simple, fast and useful ways to manage your buffers.
+
+================================================================================
+COMMANDS                                                          *npm-commands*
+
+                                                                      *:NpmInit*
+:NpmInit
+    Init Npm for current folder
+
+                                                                   *:NpmInstall*
+:NpmInstall
+    Install provided package as dependency
+
+    Shorthands:  NpmI
+
+                                                                 *:NpmUninstall*
+:NpmUninstall
+    Uninstall provided package and remove dependency
+
+    Shorthands: NpmU
+
+                                                                    *:NpmLatest*
+:NpmLatest [package_name / package_name@version]
+    Get lastest version of provided package (or package at cursor position if found)
+
+    Shorthands: Npm, NpmL
+
+                                                                       *:NpmAll*
+:NpmAll
+    Get all version of provided package (or package at cursor position if found)
+
+    Shorthands: NpmAll, NpmA
+
+================================================================================
+MAPPINGS                                                        *ezbuf-mappings*
+
+  <leader>n
+    Get lastest version of package at cursor position (if found)
+
+  <leader>N
+    Get all version of package at cursor position (if found)
+
+
+LICENSE                                                            *npm-license*
 ==============================================================================
-CONTENTS                                                           *NpmContents*
 
-    1. Introduction ......... |NpmIntroduction|
-    2. Install .............. |NpmUsage|
-    3. Usage ................ |NpmUsage|
-    4. Commands ............. |NpmCommands|
-    5. Mappings ............. |NpmMappings|
-    6. Repository............ |NpmRepository|
-    7. License .............. |NpmLicense|
+The MIT License (MIT)
+
+Copyright (c) 2020 - Kyoz (banminkyoz@gmail.com)
 
 ==============================================================================
-1: Install                                                     *NpmIntroduction*
-
-Notthing here yet...
+vim:tw=78:sw=2:ts=2:ft=help:norl:nowrap:
